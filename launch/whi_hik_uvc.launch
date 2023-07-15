@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- argument -->
+
+  <!-- params -->
+  <rosparam file="$(find whi_hik_uvc)/config/camera.yaml" command="load" subst_value="true"/>
+
+  <!-- hardware interface -->
+  <node name="whi_hik_uvc" pkg="whi_hik_uvc" type="whi_hik_uvc_node" output="screen"/>
+</launch>
