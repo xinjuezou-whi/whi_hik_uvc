@@ -171,9 +171,10 @@ namespace v4l2_camera
         /// Image buffer
         struct Buffer
         {
-            unsigned index;
-            unsigned char * start;
-            size_t length;
+            unsigned index_;
+            unsigned char* start_;
+            size_t length_;
+            size_t offset_;
         };
 
         std::string device_;

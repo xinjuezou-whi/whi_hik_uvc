@@ -46,7 +46,7 @@ namespace v4l2_camera
             << "  Streaming: " << (canStream ? "YES" : "NO"));
 
         // Get current data (pixel) format
-        auto formatReq = v4l2_format{};
+        v4l2_format formatReq;
         formatReq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         ioctl(fd_, VIDIOC_G_FMT, &formatReq);
         cur_data_format_ = PixelFormat(formatReq.fmt.pix);
@@ -93,11 +93,10 @@ namespace v4l2_camera
         // Queue the buffers
         for (auto const& buffer : buffers_)
         {
-            auto buf = v4l2_buffer{};
+            v4l2_buffer buf;
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
-            buf.index = buffer.index;
-
+            buf.index = buffer.index_;
             if (-1 == ioctl(fd_, VIDIOC_QBUF, &buf))
             {
                 ROS_ERROR_STREAM("Buffer failure on capture start: " << strerror(errno) << " (" << errno << ")");
@@ -117,7 +116,7 @@ namespace v4l2_camera
 
     sensor_msgs::Image::Ptr V4l2CameraDevice::capture()
     {
-        auto buf = v4l2_buffer{};
+        v4l2_buffer buf;
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
 
@@ -134,7 +133,7 @@ namespace v4l2_camera
         // Copy over buffer data
         const auto& buffer = buffers_[buf.index];
         img->data.resize(cur_data_format_.image_byte_size_);
-        std::copy(buffer.start, buffer.start + img->data.size(), img->data.begin());
+        std::copy(buffer.start_, buffer.start_ + img->data.size(), img->data.begin());
 
         // Requeue buffer to be reused for new captures
         if (-1 == ioctl(fd_, VIDIOC_QBUF, &buf))
@@ -143,17 +142,24 @@ namespace v4l2_camera
             return nullptr;
         }
 #ifndef DEBUG
-        cv::Mat yuyv(cur_data_format_.height_,
-			cur_data_format_.width_,
-			CV_8UC2,
-			img->data.data()/*,
-			cur_data_format_.bytes_per_line_*/);
-        cv::Mat bgr;
+        /// separation
+        cv::Mat inY = cv::Mat(cv::Size(cur_data_format_.width_, cur_data_format_.height_), CV_8UC1, img->data.data());
+        cv::imshow("y", inY);
+        cv::Mat inV = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
+            img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2,
+            cur_data_format_.bytes_per_line_ / 4);
+        cv::imshow("v", inV);
+        cv::Mat inU = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
+            img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2 +
+            (cur_data_format_.bytes_per_line_ / 4) * (cur_data_format_.height_ / 2),
+            cur_data_format_.bytes_per_line_ / 4);
+        cv::imshow("u", inU);
+        /// output is YUY2
+        cv::Mat yuyv(cur_data_format_.height_, cur_data_format_.width_, CV_8UC2, img->data.data());
+        cv::Mat bgr(cur_data_format_.height_, cur_data_format_.width_, CV_8UC3);
 	    cv::cvtColor(yuyv, bgr, cv::COLOR_YUV2BGR_YUYV);
-        // std::cout << "width " << cur_data_format_.width_ << ", height " << cur_data_format_.height_ << std::endl;
-        // std::cout << "byte size " << cur_data_format_.image_byte_size_ << ", bytes per line " <<
-        //     cur_data_format_.bytes_per_line_ << std::endl;
-        cv::imshow("test", bgr);
+        /// YUY2 end
+        cv::imshow("previewBGR", bgr);
 		cv::waitKey(10);
 #endif
 
@@ -164,17 +170,17 @@ namespace v4l2_camera
         if (cur_data_format_.format_ == V4L2_PIX_FMT_YUYV)
         {
             img->encoding = "yuv422_yuy2"; //sensor_msgs::image_encodings::YUV422_YUY2;
-            std::cout << "00000000000000000000" << std::endl;
+#ifdef DEBUG
+            std::cout << "yuv422_yuy2" << std::endl;
+#endif
         }
         else if (cur_data_format_.format_ == V4L2_PIX_FMT_UYVY)
         {
             img->encoding = sensor_msgs::image_encodings::YUV422;
-            std::cout << "111111111111111111111" << std::endl;
         }
         else if (cur_data_format_.format_ == V4L2_PIX_FMT_GREY)
         {
             img->encoding = sensor_msgs::image_encodings::MONO8;
-            std::cout << "222222222222222222222" << std::endl;
         }
         else
         {
@@ -187,7 +193,7 @@ namespace v4l2_camera
 
     v4l2_camera::Control V4l2CameraDevice::queryControl(uint32_t Id, bool Silent/* = false*/)
     {
-        auto queryctrl = v4l2_queryctrl{};
+        v4l2_queryctrl queryctrl;
         queryctrl.id = Id;
 
         if (ioctl(fd_, VIDIOC_QUERYCTRL, &queryctrl) != 0)
@@ -200,10 +206,10 @@ namespace v4l2_camera
             return {};
         }
 
-        auto menuItems = std::map<int, std::string>{};
+        std::map<int, std::string> menuItems;
         if (queryctrl.type == (unsigned)ControlType::MENU)
         {
-            auto querymenu = v4l2_querymenu{};
+            v4l2_querymenu querymenu;
             querymenu.id = queryctrl.id;
 
             // Query all enum values
@@ -217,7 +223,7 @@ namespace v4l2_camera
             }
         }
 
-        auto control = Control{};
+        Control control;
         control.id_ = queryctrl.id;
         control.name_ = std::string{reinterpret_cast<char *>(queryctrl.name)};
         control.type_ = static_cast<ControlType>(queryctrl.type);
@@ -233,7 +239,7 @@ namespace v4l2_camera
 
     int32_t V4l2CameraDevice::getControlValue(uint32_t Id) const
     {
-        auto ctrl = v4l2_control{};
+        v4l2_control ctrl;
         ctrl.id = Id;
         if (-1 == ioctl(fd_, VIDIOC_G_CTRL, &ctrl))
         {
@@ -321,8 +327,7 @@ namespace v4l2_camera
 
     V4l2CameraDevice::ImageSizesDescription V4l2CameraDevice::listDiscreteImageSizes(v4l2_frmsizeenum FrameSizeEnum)
     {
-        auto sizes = ImageSizesVector{};
-
+        ImageSizesVector sizes;
         do
         {
             sizes.emplace_back(std::make_pair(FrameSizeEnum.discrete.width, FrameSizeEnum.discrete.height));
@@ -355,7 +360,7 @@ namespace v4l2_camera
 
     bool V4l2CameraDevice::initMemoryMapping()
     {
-        auto req = v4l2_requestbuffers{};
+        v4l2_requestbuffers req;
 
         // Request 4 buffers
         req.count = 4;
@@ -374,24 +379,24 @@ namespace v4l2_camera
 
         for (auto i = 0u; i < req.count; ++i)
         {
-            auto buf = v4l2_buffer{};
-
+            v4l2_buffer buf;
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = i;
 
             ioctl(fd_, VIDIOC_QUERYBUF, &buf);
 
-            buffers_[i].index = buf.index;
-            buffers_[i].length = buf.length;
-            buffers_[i].start =
+            buffers_[i].index_ = buf.index;
+            buffers_[i].length_ = buf.length;
+            buffers_[i].offset_ = buf.m.offset;
+            buffers_[i].start_ =
                 static_cast<unsigned char *>(mmap(NULL /* start anywhere */,
                                             buf.length,
                                             PROT_READ | PROT_WRITE /* required */,
                                             MAP_SHARED /* recommended */,
                                             fd_, buf.m.offset));
 
-            if (MAP_FAILED == buffers_[i].start)
+            if (MAP_FAILED == buffers_[i].start_)
             {
                 ROS_ERROR("Failed mapping device memory");
                 return false;
