@@ -98,13 +98,18 @@ namespace v4l2_camera
     {
         ROS_INFO("Starting camera");
 
-        // fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        // fmt.fmt.pix.width       = width;
-        // fmt.fmt.pix.height      = height;
-        // fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
-        // fmt.fmt.pix.field       = V4L2_FIELD_ANY;
-        // if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
-        //     errno_exit("VIDIOC_S_FMT");
+        // set to YUYV if it is supported by camera
+        auto isYuyv = [](ImageFormat Format) { return Format.format_ == V4L2_PIX_FMT_YUYV; };
+        if (auto it = std::find_if(image_formats_.begin(), image_formats_.end(), isYuyv); it != image_formats_.end())
+        {
+            v4l2_format fmtSet;
+            fmtSet.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+            fmtSet.fmt.pix.width = cur_data_format_.width_;
+            fmtSet.fmt.pix.height = cur_data_format_.height_;
+            fmtSet.fmt.pix.pixelformat = V4L2_PIX_FMT_YUYV;
+            fmtSet.fmt.pix.field = V4L2_FIELD_ANY;
+            xioctl(fd_, VIDIOC_S_FMT, &fmtSet);
+        }
 
         if (!initMemoryMapping())
         {
