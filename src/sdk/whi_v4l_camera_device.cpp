@@ -270,6 +270,15 @@ namespace v4l2_camera
         return ctrl.value;
     }
 
+    std::string V4l2CameraDevice::getCameraName() const
+    {
+        auto name = std::string((char*)(capabilities_.card));
+        std::transform(name.begin(), name.end(), name.begin(), ::tolower);
+        std::replace(name.begin(), name.end(), ' ', '_');
+
+        return name;
+    }
+
     void V4l2CameraDevice::listImageFormats()
     {
         image_formats_.clear();

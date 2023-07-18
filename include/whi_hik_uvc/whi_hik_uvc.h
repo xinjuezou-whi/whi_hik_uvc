@@ -19,6 +19,7 @@ Changelog:
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
+#include <camera_info_manager/camera_info_manager.h>
 
 #include <memory>
 #include <thread>
@@ -50,6 +51,8 @@ namespace whi_hik_uvc
         std::string device_{ "/dev/video0" };
         std::string frame_id_{ "camera" };
         std::unique_ptr<image_transport::ImageTransport> image_transport_{ nullptr };
-        std::unique_ptr<image_transport::Publisher> pub_{ nullptr };
+        std::unique_ptr<camera_info_manager::CameraInfoManager> cam_info_{ nullptr };
+        std::unique_ptr<image_transport::Publisher> pub_image_{ nullptr };
+        std::unique_ptr<image_transport::CameraPublisher> pub_info_{ nullptr };
 	};
 } // namespace whi_hik_uvc

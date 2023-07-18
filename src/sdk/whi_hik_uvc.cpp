@@ -37,12 +37,14 @@ namespace whi_hik_uvc
         // device params
         node_handle_->param("whi_hik_uvc/device", device_, std::string("/dev/video0"));
         node_handle_->param("whi_hik_uvc/frame_id", frame_id_, std::string("camera"));
-        std::string topic;
-        node_handle_->param("whi_hik_uvc/topic", topic, std::string("image"));
+        std::string topicImg, topicInfo;
+        node_handle_->param("whi_hik_uvc/topic_image", topicImg, std::string("image"));
+        node_handle_->param("whi_hik_uvc/cam_info", topicInfo, std::string("cam_info"));
 
         // publisher
         image_transport_ = std::make_unique<image_transport::ImageTransport>(*node_handle_);
-        pub_ = std::make_unique<image_transport::Publisher>(image_transport_->advertise(topic, 1));
+        pub_image_ = std::make_unique<image_transport::Publisher>(image_transport_->advertise(topicImg, 1));
+        pub_info_ = std::make_unique<image_transport::CameraPublisher>();
 
         // spinner
         node_handle_->param("whi_hik_uvc/loop_hz", loop_hz_, 10.0);
@@ -66,6 +68,8 @@ namespace whi_hik_uvc
         camera_->open();
         camera_->start();
 
+        cam_info_ = std::make_unique<camera_info_manager::CameraInfoManager>(*node_handle_, camera_->getCameraName());
+
         th_streaming_ = std::thread
         {
             [this]() -> void
@@ -87,31 +91,12 @@ namespace whi_hik_uvc
                     //         img->encoding << " => " << output_encoding_);
                     //     img = convert(*img);
                     // }
-                    //img = convert(img);
+                    // img = convert(img);
                     img->header.stamp = ros::Time::now();
                     img->header.frame_id = frame_id_;
-                    pub_->publish(img);
-
-                    // auto ci = std::make_unique<sensor_msgs::msg::CameraInfo>(cinfo_->getCameraInfo());
-                    // if (!checkCameraInfo(*img, *ci))
-                    // {
-                    //     *ci = sensor_msgs::msg::CameraInfo{};
-                    //     ci->height = img->height;
-                    //     ci->width = img->width;
-                    // }
-
-                    // ci->header.stamp = stamp;
-
-                    // if (get_node_options().use_intra_process_comms())
-                    // {
-                    //     ROS_DEBUG_STREAM("Image message address [PUBLISH]:\t" << img.get());
-                    //     image_pub_->publish(std::move(img));
-                    //     info_pub_->publish(std::move(ci));
-                    // }
-                    // else
-                    // {
-                    //     camera_transport_pub_.publish(*img, *ci);
-                    // }
+                    pub_image_->publish(img);
+                    auto camInfo = std::make_unique<sensor_msgs::CameraInfo>(cam_info_->getCameraInfo());
+                    pub_info_->publish(*img, *camInfo, img->header.stamp);
                 }
             }
         };

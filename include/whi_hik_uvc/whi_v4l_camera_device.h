@@ -134,6 +134,13 @@ namespace v4l2_camera
         // Attempt to set current control value
         bool setControlValue(uint32_t id, int32_t value);
 
+        const auto& getImageFormats() const { return image_formats_; }
+        const auto& getImageSizes() const { return image_sizes_; }
+        const auto& getCurrentDataFormat() const { return cur_data_format_; }
+        bool requestDataFormat(PixelFormat const& Format);
+        std::string getCameraName() const;
+
+    private:
         // Types used to describe available image sizes
         enum class ImageSizeType
         {
@@ -143,15 +150,6 @@ namespace v4l2_camera
         };
         using ImageSizesVector = std::vector<std::pair<uint16_t, uint16_t>>;
         using ImageSizesDescription = std::pair<ImageSizeType, ImageSizesVector>;
-
-        const auto& getImageFormats() const { return image_formats_; }
-        const auto& getImageSizes() const { return image_sizes_; }
-        const auto& getCurrentDataFormat() const { return cur_data_format_; }
-        bool requestDataFormat(PixelFormat const & format);
-
-        std::string getCameraName();
-
-    private:
         // Requests and stores all formats available for this camera
         void listImageFormats();
         // Requests and stores all frame sizes available for this camera

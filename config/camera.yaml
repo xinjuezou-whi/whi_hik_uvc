@@ -1,5 +1,6 @@
 whi_hik_uvc:
   device: /dev/video0
   frame_id: camera
-  topic: image
+  topic_image: image
+  topic_info: cam_info
   loop_hz: 20 # hz
