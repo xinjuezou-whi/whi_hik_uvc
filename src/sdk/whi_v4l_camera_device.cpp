@@ -161,27 +161,6 @@ namespace v4l2_camera
             ROS_ERROR_STREAM("Error re-queueing buffer: " << strerror(errno) << " (" << errno);
             return nullptr;
         }
-#ifndef DEBUG
-        /// separation
-        cv::Mat inY = cv::Mat(cv::Size(cur_data_format_.width_, cur_data_format_.height_), CV_8UC1, img->data.data());
-        cv::imshow("y", inY);
-        cv::Mat inV = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
-            img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2,
-            cur_data_format_.bytes_per_line_ / 4);
-        cv::imshow("v", inV);
-        cv::Mat inU = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
-            img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2 +
-            (cur_data_format_.bytes_per_line_ / 4) * (cur_data_format_.height_ / 2),
-            cur_data_format_.bytes_per_line_ / 4);
-        cv::imshow("u", inU);
-        /// output is YUY2
-        cv::Mat yuyv(cur_data_format_.height_, cur_data_format_.width_, CV_8UC2, img->data.data());
-        cv::Mat bgr(cur_data_format_.height_, cur_data_format_.width_, CV_8UC3);
-	    cv::cvtColor(yuyv, bgr, cv::COLOR_YUV2BGR_YUYV);
-        /// YUY2 end
-        cv::imshow("previewBGR", bgr);
-		cv::waitKey(10);
-#endif
 
         // Fill in remaining image information
         img->width = cur_data_format_.width_;
@@ -189,10 +168,30 @@ namespace v4l2_camera
         img->step = cur_data_format_.bytes_per_line_;
         if (cur_data_format_.format_ == V4L2_PIX_FMT_YUYV)
         {
-            img->encoding = "yuv422_yuy2"; //sensor_msgs::image_encodings::YUV422_YUY2;
+            img->encoding = sensor_msgs::image_encodings::BGR8; //sensor_msgs::image_encodings::YUV422_YUY2;
+            
+            /// output is YUY2
+            cv::Mat yuyv(cur_data_format_.height_, cur_data_format_.width_, CV_8UC2, img->data.data());
+            cv::Mat bgr(cur_data_format_.height_, cur_data_format_.width_, CV_8UC3);
+	        cv::cvtColor(yuyv, bgr, cv::COLOR_YUV2BGR_YUYV);
 #ifdef DEBUG
-            std::cout << "yuv422_yuy2" << std::endl;
+            /// separation
+            cv::Mat inY = cv::Mat(cv::Size(cur_data_format_.width_, cur_data_format_.height_), CV_8UC1, img->data.data());
+            cv::imshow("y", inY);
+            cv::Mat inV = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
+                img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2,
+                cur_data_format_.bytes_per_line_ / 4);
+            cv::imshow("v", inV);
+            cv::Mat inU = cv::Mat(cv::Size(cur_data_format_.width_/2, cur_data_format_.height_/2), CV_8UC1,
+                img->data.data() + cur_data_format_.bytes_per_line_ * cur_data_format_.height_ / 2 +
+                (cur_data_format_.bytes_per_line_ / 4) * (cur_data_format_.height_ / 2),
+                cur_data_format_.bytes_per_line_ / 4);
+            cv::imshow("u", inU);
+            cv::imshow("previewBGR", bgr);
+		    cv::waitKey(10);
 #endif
+            img->data.resize(bgr.cols * bgr.rows * bgr.channels());
+            std::copy(bgr.datastart, bgr.dataend, img->data.begin());
         }
         else if (cur_data_format_.format_ == V4L2_PIX_FMT_UYVY)
         {
@@ -201,6 +200,10 @@ namespace v4l2_camera
         else if (cur_data_format_.format_ == V4L2_PIX_FMT_GREY)
         {
             img->encoding = sensor_msgs::image_encodings::MONO8;
+        }
+        else if (cur_data_format_.format_ == V4L2_PIX_FMT_MJPEG)
+        {
+            img->encoding = sensor_msgs::image_encodings::RGB8;
         }
         else
         {
