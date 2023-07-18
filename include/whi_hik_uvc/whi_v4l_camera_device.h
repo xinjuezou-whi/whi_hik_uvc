@@ -16,7 +16,6 @@ Changelog:
 ******************************************************************/
 #pragma once
 #include <sensor_msgs/Image.h>
-#include <sensor_msgs/image_encodings.h>
 
 #include <linux/videodev2.h>
 #include <string>
@@ -98,7 +97,7 @@ namespace v4l2_camera
         unsigned format_;
     };
 
-    struct FourCC
+    struct v4l2_fourcc
     {
         inline static std::string toString(unsigned Fourcc)
         {
@@ -145,9 +144,9 @@ namespace v4l2_camera
         using ImageSizesVector = std::vector<std::pair<uint16_t, uint16_t>>;
         using ImageSizesDescription = std::pair<ImageSizeType, ImageSizesVector>;
 
-        auto const & getImageFormats() const {return image_formats_;}
-        auto const & getImageSizes() const {return image_sizes_;}
-        auto const & getCurrentDataFormat() const {return cur_data_format_;}
+        const auto& getImageFormats() const { return image_formats_; }
+        const auto& getImageSizes() const { return image_sizes_; }
+        const auto& getCurrentDataFormat() const { return cur_data_format_; }
         bool requestDataFormat(PixelFormat const & format);
 
         std::string getCameraName();
@@ -172,9 +171,8 @@ namespace v4l2_camera
         struct Buffer
         {
             unsigned index_;
-            unsigned char* start_;
+            uint8_t* start_;
             size_t length_;
-            size_t offset_;
         };
 
         std::string device_;

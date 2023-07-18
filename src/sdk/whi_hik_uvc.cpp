@@ -13,6 +13,8 @@ All text above must be included in any redistribution.
 ******************************************************************/
 #include "whi_hik_uvc/whi_hik_uvc.h"
 
+//#include <cv_bridge/cv_bridge.h>
+
 namespace whi_hik_uvc
 {
     HikUvc::HikUvc(std::shared_ptr<ros::NodeHandle>& NodeHandle)
@@ -35,6 +37,12 @@ namespace whi_hik_uvc
         // device params
         node_handle_->param("whi_hik_uvc/device", device_, std::string("/dev/video0"));
         node_handle_->param("whi_hik_uvc/frame_id", frame_id_, std::string("camera"));
+        std::string topic;
+        node_handle_->param("whi_hik_uvc/topic", topic, std::string("image"));
+
+        // publisher
+        image_transport_ = std::make_unique<image_transport::ImageTransport>(*node_handle_);
+        pub_ = std::make_unique<image_transport::Publisher>(image_transport_->advertise(topic, 1));
 
         // spinner
         node_handle_->param("whi_hik_uvc/loop_hz", loop_hz_, 10.0);
@@ -72,7 +80,6 @@ namespace whi_hik_uvc
                         continue;
                     }
 
-                    auto stamp = ros::Time::now();
                     // if (img->encoding != output_encoding_) // TODO
                     // {
                     //     ROS_WARN_STREAM_ONCE(
@@ -80,8 +87,10 @@ namespace whi_hik_uvc
                     //         img->encoding << " => " << output_encoding_);
                     //     img = convert(*img);
                     // }
-                    img->header.stamp = stamp;
+                    //img = convert(img);
+                    img->header.stamp = ros::Time::now();
                     img->header.frame_id = frame_id_;
+                    pub_->publish(img);
 
                     // auto ci = std::make_unique<sensor_msgs::msg::CameraInfo>(cinfo_->getCameraInfo());
                     // if (!checkCameraInfo(*img, *ci))
@@ -107,4 +116,14 @@ namespace whi_hik_uvc
             }
         };
     }
+
+    // sensor_msgs::Image::Ptr HikUvc::convert(const sensor_msgs::ImageConstPtr Img) const
+    // {
+    //     auto cvImg = cv_bridge::toCvShare(Img);
+    //     auto outImg = std::make_unique<sensor_msgs::Image>();
+    //     auto cvConvertedImg = cv_bridge::cvtColor(cvImg, "bgr8");
+    //     cvConvertedImg->toImageMsg(*outImg);
+
+    //     return outImg;
+    // }
 } // namespace whi_hik_uvc

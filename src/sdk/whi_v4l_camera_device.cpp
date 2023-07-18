@@ -14,6 +14,7 @@ All text above must be included in any redistribution.
 #include "whi_hik_uvc/whi_v4l_camera_device.h"
 
 #include <ros/ros.h>
+#include <sensor_msgs/image_encodings.h>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
@@ -23,6 +24,18 @@ All text above must be included in any redistribution.
 
 namespace v4l2_camera
 {
+    static int xioctl(int Handle, int Request, void* Arg)
+    {
+        int r;
+
+        do
+        {
+            r = ioctl(Handle, Request, Arg);
+        } while (-1 == r && EINTR == errno);
+
+        return r;
+    }
+
     bool V4l2CameraDevice::open()
     {
         fd_ = ::open(device_.c_str(), O_RDWR);
@@ -33,7 +46,7 @@ namespace v4l2_camera
         }
 
         // List capabilities
-        ioctl(fd_, VIDIOC_QUERYCAP, &capabilities_);
+        xioctl(fd_, VIDIOC_QUERYCAP, &capabilities_);
 
         auto canRead = capabilities_.capabilities & V4L2_CAP_READWRITE;
         auto canStream = capabilities_.capabilities & V4L2_CAP_STREAMING;
@@ -48,10 +61,9 @@ namespace v4l2_camera
         // Get current data (pixel) format
         v4l2_format formatReq;
         formatReq.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        ioctl(fd_, VIDIOC_G_FMT, &formatReq);
+        xioctl(fd_, VIDIOC_G_FMT, &formatReq);
         cur_data_format_ = PixelFormat(formatReq.fmt.pix);
-
-        ROS_INFO_STREAM("Current pixel format: " << FourCC::toString(cur_data_format_.format_) <<
+        ROS_INFO_STREAM("Current pixel format: " << v4l2_fourcc::toString(cur_data_format_.format_) <<
             " @ " << cur_data_format_.width_ << "x" << cur_data_format_.height_);
 
         // List all available image formats and controls
@@ -62,7 +74,7 @@ namespace v4l2_camera
         ROS_INFO("Available pixel formats:");
         for (auto const & format : image_formats_)
         {
-            ROS_INFO_STREAM("  " << FourCC::toString(format.format_) << " - " << format.description_);
+            ROS_INFO_STREAM("  " << v4l2_fourcc::toString(format.format_) << " - " << format.description_);
         }
 
         if (controls_.empty())
@@ -85,6 +97,15 @@ namespace v4l2_camera
     bool V4l2CameraDevice::start()
     {
         ROS_INFO("Starting camera");
+
+        // fmt.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
+        // fmt.fmt.pix.width       = width;
+        // fmt.fmt.pix.height      = height;
+        // fmt.fmt.pix.pixelformat = V4L2_PIX_FMT_UYVY;
+        // fmt.fmt.pix.field       = V4L2_FIELD_ANY;
+        // if (-1 == xioctl(fd, VIDIOC_S_FMT, &fmt))
+        //     errno_exit("VIDIOC_S_FMT");
+
         if (!initMemoryMapping())
         {
             return false;
@@ -97,7 +118,7 @@ namespace v4l2_camera
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = buffer.index_;
-            if (-1 == ioctl(fd_, VIDIOC_QBUF, &buf))
+            if (-1 == xioctl(fd_, VIDIOC_QBUF, &buf))
             {
                 ROS_ERROR_STREAM("Buffer failure on capture start: " << strerror(errno) << " (" << errno << ")");
                 return false;
@@ -106,7 +127,7 @@ namespace v4l2_camera
 
         // Start stream
         unsigned type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        if (-1 == ioctl(fd_, VIDIOC_STREAMON, &type))
+        if (-1 == xioctl(fd_, VIDIOC_STREAMON, &type))
         {
             ROS_ERROR_STREAM("Failed stream start: " << strerror(errno) << " (" << errno << ")");
             return false;
@@ -119,9 +140,8 @@ namespace v4l2_camera
         v4l2_buffer buf;
         buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         buf.memory = V4L2_MEMORY_MMAP;
-
         // Dequeue buffer with new image
-        if (-1 == ioctl(fd_, VIDIOC_DQBUF, &buf))
+        if (-1 == xioctl(fd_, VIDIOC_DQBUF, &buf))
         {
             ROS_ERROR_STREAM("Error dequeueing buffer: " << strerror(errno) << " (" << errno << ")");
             return nullptr;
@@ -136,7 +156,7 @@ namespace v4l2_camera
         std::copy(buffer.start_, buffer.start_ + img->data.size(), img->data.begin());
 
         // Requeue buffer to be reused for new captures
-        if (-1 == ioctl(fd_, VIDIOC_QBUF, &buf))
+        if (-1 == xioctl(fd_, VIDIOC_QBUF, &buf))
         {
             ROS_ERROR_STREAM("Error re-queueing buffer: " << strerror(errno) << " (" << errno);
             return nullptr;
@@ -185,7 +205,7 @@ namespace v4l2_camera
         else
         {
             ROS_WARN_STREAM("Current pixel format is not supported yet: " <<
-                FourCC::toString(cur_data_format_.format_) << " " << cur_data_format_.format_);
+                v4l2_fourcc::toString(cur_data_format_.format_) << " " << cur_data_format_.format_);
         }
 
         return img;
@@ -195,8 +215,7 @@ namespace v4l2_camera
     {
         v4l2_queryctrl queryctrl;
         queryctrl.id = Id;
-
-        if (ioctl(fd_, VIDIOC_QUERYCTRL, &queryctrl) != 0)
+        if (xioctl(fd_, VIDIOC_QUERYCTRL, &queryctrl) != 0)
         {
             if (!Silent)
             {
@@ -216,7 +235,7 @@ namespace v4l2_camera
             for (auto i = queryctrl.minimum; i <= queryctrl.maximum; i++)
             {
                 querymenu.index = i;
-                if (ioctl(fd_, VIDIOC_QUERYMENU, &querymenu) == 0)
+                if (xioctl(fd_, VIDIOC_QUERYMENU, &querymenu) == 0)
                 {
                     menuItems[i] = (const char *)querymenu.name;
                 }
@@ -241,7 +260,7 @@ namespace v4l2_camera
     {
         v4l2_control ctrl;
         ctrl.id = Id;
-        if (-1 == ioctl(fd_, VIDIOC_G_CTRL, &ctrl))
+        if (-1 == xioctl(fd_, VIDIOC_G_CTRL, &ctrl))
         {
             ROS_ERROR_STREAM("Failed getting value for control " << ctrl.id << ": " <<
                 strerror(errno) << " (" << errno << "); returning 0!");
@@ -258,7 +277,7 @@ namespace v4l2_camera
         struct v4l2_fmtdesc fmtDesc;
         fmtDesc.index = 0;
         fmtDesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
-        while (ioctl(fd_, VIDIOC_ENUM_FMT, &fmtDesc) == 0)
+        while (xioctl(fd_, VIDIOC_ENUM_FMT, &fmtDesc) == 0)
         {
             image_formats_.emplace_back(fmtDesc);
             fmtDesc.index++;
@@ -274,8 +293,7 @@ namespace v4l2_camera
         {
             frameSizeEnum.index = 0;
             frameSizeEnum.pixel_format = format.format_;
-
-            if (-1 == ioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &frameSizeEnum))
+            if (-1 == xioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &frameSizeEnum))
             {
                 ROS_ERROR_STREAM("Failed listing frame size " << strerror(errno) << " (" << errno << ")");
                 continue;
@@ -332,7 +350,7 @@ namespace v4l2_camera
         {
             sizes.emplace_back(std::make_pair(FrameSizeEnum.discrete.width, FrameSizeEnum.discrete.height));
             FrameSizeEnum.index++;
-        } while (ioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &FrameSizeEnum) == 0);
+        } while (xioctl(fd_, VIDIOC_ENUM_FRAMESIZES, &FrameSizeEnum) == 0);
 
         return std::make_pair(ImageSizeType::DISCRETE, std::move(sizes));
     }
@@ -361,40 +379,32 @@ namespace v4l2_camera
     bool V4l2CameraDevice::initMemoryMapping()
     {
         v4l2_requestbuffers req;
-
-        // Request 4 buffers
-        req.count = 4;
+        req.count = 4; // request 4 buffers
         req.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
         req.memory = V4L2_MEMORY_MMAP;
-        ioctl(fd_, VIDIOC_REQBUFS, &req);
-
-        // Didn't get more than 1 buffer
+        xioctl(fd_, VIDIOC_REQBUFS, &req);
         if (req.count < 2)
         {
-            ROS_ERROR("Insufficient buffer memory");
+            ROS_ERROR("insufficient buffer memory");
             return false;
         }
 
-        buffers_ = std::vector<Buffer>(req.count);
-
+        buffers_.resize(req.count);
         for (auto i = 0u; i < req.count; ++i)
         {
             v4l2_buffer buf;
             buf.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
             buf.memory = V4L2_MEMORY_MMAP;
             buf.index = i;
-
-            ioctl(fd_, VIDIOC_QUERYBUF, &buf);
+            xioctl(fd_, VIDIOC_QUERYBUF, &buf);
 
             buffers_[i].index_ = buf.index;
             buffers_[i].length_ = buf.length;
-            buffers_[i].offset_ = buf.m.offset;
-            buffers_[i].start_ =
-                static_cast<unsigned char *>(mmap(NULL /* start anywhere */,
-                                            buf.length,
-                                            PROT_READ | PROT_WRITE /* required */,
-                                            MAP_SHARED /* recommended */,
-                                            fd_, buf.m.offset));
+            buffers_[i].start_ = (uint8_t*)mmap(NULL /* start anywhere */,
+                                                buf.length,
+                                                PROT_READ | PROT_WRITE /* required */,
+                                                MAP_SHARED /* recommended */,
+                                                fd_, buf.m.offset);
 
             if (MAP_FAILED == buffers_[i].start_)
             {

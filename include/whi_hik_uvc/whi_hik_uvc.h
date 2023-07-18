@@ -18,6 +18,7 @@ Changelog:
 #include "whi_hik_uvc/whi_v4l_camera_device.h"
 
 #include <ros/ros.h>
+#include <image_transport/image_transport.h>
 
 #include <memory>
 #include <thread>
@@ -36,6 +37,7 @@ namespace whi_hik_uvc
         void init();
         void update(const ros::TimerEvent & Event);
         void streaming();
+        sensor_msgs::Image::Ptr convert(const sensor_msgs::ImageConstPtr Img) const;
 
     protected:
         std::shared_ptr<ros::NodeHandle> node_handle_{ nullptr };
@@ -47,5 +49,7 @@ namespace whi_hik_uvc
         std::unique_ptr<v4l2_camera::V4l2CameraDevice> camera_;
         std::string device_{ "/dev/video0" };
         std::string frame_id_{ "camera" };
+        std::unique_ptr<image_transport::ImageTransport> image_transport_{ nullptr };
+        std::unique_ptr<image_transport::Publisher> pub_{ nullptr };
 	};
 } // namespace whi_hik_uvc
