@@ -5,6 +5,10 @@ Features:
 - HIK UVC interfaces based on SDK
 - xxx
 
+Dependencies:
+- sudo ln ~/catkin_workspace/src/whi_hik_uvc/lib/libHCUSBSDK.so /usr/lib/libHCUSBSDK.so
+  sudo ln ~/catkin_workspace/src/whi_hik_uvc/lib/libhpr.so /usr/lib/libhpr.so
+
 Written by Xinjue Zou, xinjue.zou@outlook.com
 
 GNU General Public License, check LICENSE for more information.
