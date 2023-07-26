@@ -8,6 +8,10 @@ Features:
 Dependencies:
 - sudo ln ~/catkin_workspace/src/whi_hik_uvc/lib/libHCUSBSDK.so /usr/lib/libHCUSBSDK.so
   sudo ln ~/catkin_workspace/src/whi_hik_uvc/lib/libhpr.so /usr/lib/libhpr.so
+- sudo pluma /etc/udev/rules.d/99-usbhik.rules 
+  copy and paste following contents to file and save:
+  ACTION=="add",SUBSYSTEMS=="usb", ATTRS{idVendor}=="2bdf", ATTRS{idProduct}=="0102", GROUP="users", MODE="0777"
+  then reboot
 
 Written by Xinjue Zou, xinjue.zou@outlook.com
 
