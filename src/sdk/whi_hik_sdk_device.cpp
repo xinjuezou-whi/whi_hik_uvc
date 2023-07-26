@@ -30,7 +30,11 @@ namespace whi_hik_uvc
     bool HikSdk::open()
     {
         // sdk init process
-        if (!USB_Init())
+        if (USB_Init())
+        {
+            ROS_INFO_STREAM("init USB succeed");
+        }
+        else
         {
             DWORD error = USB_GetLastError();
             ROS_ERROR_STREAM("failed to init USB, err " << error << ": " << USB_GetErrorMsg(error));
@@ -38,14 +42,29 @@ namespace whi_hik_uvc
         }
         ROS_INFO_STREAM(getVersionString());
         auto deviceNum = USB_GetDeviceCount();
-        std::cout << "nnnnnnnnnnnnnnnnnn " << deviceNum << std::endl;
+        if (deviceNum <= 0)
+        {
+            DWORD error = USB_GetLastError();
+            ROS_ERROR_STREAM("failed to find device, err " << error << ": " << USB_GetErrorMsg(error));
+            return false;
+        }
+        else
+        {
+            ROS_INFO_STREAM("device number: " << deviceNum);
+        }
         if (USB_EnumDevices(deviceNum, &device_info_[0]))
         {
-            ROS_INFO_STREAM("enumerated device: VID [" << device_info_[0].dwVID << "], PID [" << device_info_[0].dwPID << "]");
+            ROS_INFO_STREAM("enumerated device: VID [" << device_info_[0].dwVID << "], PID ["
+                << device_info_[0].dwPID << "]");
+        }
+        else
+        {
+            DWORD error = USB_GetLastError();
+            ROS_ERROR_STREAM("failed to enumerate device, err " << error << ": " << USB_GetErrorMsg(error));
+            return false;
         }
         USB_DEVICE_REG_RES deviceRegRes = { 0 };
         user_id_ = USB_Login(&cur_user_login_info_, &deviceRegRes);
-        std::cout << "ddddddddddddddddddddddddddddddddd " << user_id_ << std::endl;
         getDeviceInfo(user_id_);
 
         return true;
