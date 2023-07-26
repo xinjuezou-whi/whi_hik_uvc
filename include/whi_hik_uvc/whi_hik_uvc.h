@@ -15,7 +15,7 @@ Changelog:
 2022-xx-xx: xxx
 ******************************************************************/
 #pragma once
-#include "whi_hik_uvc/whi_v4l_camera_device.h"
+#include "whi_abstract_camera.h"
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
@@ -37,7 +37,7 @@ namespace whi_hik_uvc
     protected:
         void init();
         void update(const ros::TimerEvent & Event);
-        void streaming();
+        void streaming(std::shared_ptr<WhiCamera> Camera);
         sensor_msgs::Image::Ptr convert(const sensor_msgs::ImageConstPtr Img) const;
 
     protected:
@@ -47,8 +47,6 @@ namespace whi_hik_uvc
         double loop_hz_{ 10.0 };
         std::thread th_streaming_;
         std::atomic<bool> terminated_{ false };
-        std::unique_ptr<v4l2_camera::V4l2CameraDevice> camera_;
-        std::string device_{ "/dev/video0" };
         std::string frame_id_{ "camera" };
         std::unique_ptr<image_transport::ImageTransport> image_transport_{ nullptr };
         std::unique_ptr<camera_info_manager::CameraInfoManager> cam_info_{ nullptr };

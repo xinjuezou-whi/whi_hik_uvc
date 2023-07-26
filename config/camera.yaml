@@ -1,6 +1,8 @@
 whi_hik_uvc:
-  device: /dev/video0
+  interface: v4l2 # sdk, v4l2
   frame_id: camera
   topic_image: image
   topic_info: cam_info
   loop_hz: 20 # hz
+  v4l2:
+    device: /dev/video0

@@ -12,7 +12,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   image_transport
   camera_info_manager
-  #cv_bridge
+  cv_bridge
 )
 
 ## System dependencies are found with CMake's conventions
@@ -135,7 +135,7 @@ target_link_libraries(${PROJECT_NAME}
    opencv_highgui
    opencv_imgproc
    opencv_imgcodecs
-   #HCUSBSDK
+   HCUSBSDK
 )
 
 # add_library(${PROJECT_NAME}

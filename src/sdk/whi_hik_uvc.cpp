@@ -12,8 +12,10 @@ All text above must be included in any redistribution.
 
 ******************************************************************/
 #include "whi_hik_uvc/whi_hik_uvc.h"
+#include "whi_hik_uvc/whi_v4l_device.h"
+#include "whi_hik_uvc/whi_hik_sdk_device.h"
 
-//#include <cv_bridge/cv_bridge.h>
+#include <cv_bridge/cv_bridge.h>
 
 namespace whi_hik_uvc
 {
@@ -34,8 +36,7 @@ namespace whi_hik_uvc
 
     void HikUvc::init()
     {
-        // device params
-        node_handle_->param("whi_hik_uvc/device", device_, std::string("/dev/video0"));
+        // params
         node_handle_->param("whi_hik_uvc/frame_id", frame_id_, std::string("camera"));
         std::string topicImg, topicInfo;
         node_handle_->param("whi_hik_uvc/topic_image", topicImg, std::string("image"));
@@ -52,7 +53,22 @@ namespace whi_hik_uvc
         non_realtime_loop_ = std::make_unique<ros::Timer>(node_handle_->createTimer(updateFreq,
             std::bind(&HikUvc::update, this, std::placeholders::_1)));
 
-        streaming();
+        /// camera
+        std::shared_ptr<WhiCamera> camera;
+        // interface type
+        std::string ifType;
+        node_handle_->param("whi_hik_uvc/interface", ifType, std::string("v4l2"));
+        if (ifType == "v4l2")
+        {
+            std::string device;
+            node_handle_->param("whi_hik_uvc/v4l2/device", device, std::string("/dev/video0"));
+            camera = std::make_shared<v4l2_camera::V4l2CameraDevice>(device);
+        }
+        else if (ifType == "sdk")
+        {
+            camera = std::make_shared<HikSdk>();
+        }
+        streaming(camera);
     }
 
     void HikUvc::update(const ros::TimerEvent& Event)
@@ -62,21 +78,24 @@ namespace whi_hik_uvc
         //std::cout << "elapsed " << elapsed_time_.toSec() << std::endl;
     }
 
-    void HikUvc::streaming()
+    void HikUvc::streaming(std::shared_ptr<WhiCamera> Camera)
     {
-        camera_ = std::make_unique<v4l2_camera::V4l2CameraDevice>(device_);
-        camera_->open();
-        camera_->start();
+        Camera->open();
+        if (!Camera->isOpened())
+        {
+            return;
+        }
+        Camera->start();
 
-        cam_info_ = std::make_unique<camera_info_manager::CameraInfoManager>(*node_handle_, camera_->getCameraName());
+        cam_info_ = std::make_unique<camera_info_manager::CameraInfoManager>(*node_handle_, Camera->getCameraName());
 
         th_streaming_ = std::thread
         {
-            [this]() -> void
+            [this, Camera]() -> void
             {
                 while (!terminated_.load())
                 {
-                    auto img = camera_->capture();
+                    auto img = Camera->capture();
                     if (img == nullptr)
                     {
                         // Failed capturing image, assume it is temporarily and continue a bit later
@@ -102,13 +121,13 @@ namespace whi_hik_uvc
         };
     }
 
-    // sensor_msgs::Image::Ptr HikUvc::convert(const sensor_msgs::ImageConstPtr Img) const
-    // {
-    //     auto cvImg = cv_bridge::toCvShare(Img);
-    //     auto outImg = std::make_unique<sensor_msgs::Image>();
-    //     auto cvConvertedImg = cv_bridge::cvtColor(cvImg, "bgr8");
-    //     cvConvertedImg->toImageMsg(*outImg);
+    sensor_msgs::Image::Ptr HikUvc::convert(const sensor_msgs::ImageConstPtr Img) const
+    {
+        auto cvImg = cv_bridge::toCvShare(Img);
+        auto outImg = std::make_unique<sensor_msgs::Image>();
+        auto cvConvertedImg = cv_bridge::cvtColor(cvImg, "bgr8");
+        cvConvertedImg->toImageMsg(*outImg);
 
-    //     return outImg;
-    // }
+        return outImg;
+    }
 } // namespace whi_hik_uvc
