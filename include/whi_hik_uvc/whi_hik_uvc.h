@@ -15,7 +15,7 @@ Changelog:
 2022-xx-xx: xxx
 ******************************************************************/
 #pragma once
-#include "whi_abstract_camera.h"
+#include "whi_base_camera.h"
 
 #include <ros/ros.h>
 #include <image_transport/image_transport.h>
