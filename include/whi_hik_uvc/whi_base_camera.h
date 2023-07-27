@@ -21,7 +21,7 @@ class WhiCamera
 {
 public:
     WhiCamera() = default;
-    ~WhiCamera() = default;
+    virtual ~WhiCamera() = default;
 
 public:
     virtual bool open() = 0;

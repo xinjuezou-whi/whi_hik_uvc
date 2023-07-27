@@ -116,7 +116,7 @@ namespace v4l2_camera
     public:
         explicit V4l2CameraDevice(const std::string& Device)
             : WhiCamera(), device_(Device) {};
-        ~V4l2CameraDevice() = default;
+        virtual ~V4l2CameraDevice() = default;
 
         bool open() override;
         bool start() override;

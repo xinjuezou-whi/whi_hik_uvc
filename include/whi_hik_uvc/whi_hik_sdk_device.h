@@ -37,7 +37,7 @@ namespace whi_hik_uvc
 	{
     public:
         HikSdk() = default;
-        ~HikSdk() = default;
+        virtual ~HikSdk() = default;
 
     protected:
         bool open() override;
