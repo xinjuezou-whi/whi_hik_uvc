@@ -24,8 +24,6 @@ Changelog:
 #include <memory>
 #include <thread>
 
-//#include "imu_base.h"
-
 namespace whi_hik_uvc
 {
 	class HikUvc
